@@ -14,6 +14,7 @@ function App() {
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
       const parsedData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
       setData(parsedData);
     };
 
@@ -24,40 +25,52 @@ function App() {
     setData([]);
   };
 
-  const calculateValues = () => {
-    if (data.length < 2) return { totalInvestment: 0, totalPE: 0, totalCE: 0 };
+  const calculateSums = () => {
+    const headers = data[0];
+    const rows = data.slice(1);
 
-    const header = data[0].map((h) => h?.toString().trim().toUpperCase());
-
-    const optionTypeIndex = header.indexOf('OPTION TYPE');
-    const pnlIndex = header.indexOf('PNL_BUYPRICE_CLOSEPRICE');
-    const marginIndex = header.indexOf('MARGIN');
+    const marginIndex = headers.indexOf("MARGIN");
+    const pnlIndex = headers.indexOf("PNL_BUYPRICE_CLOSEPRICE");
+    const optionTypeIndex = headers.indexOf("OPTION TYPE");
 
     let totalInvestment = 0;
-    let totalPE = 0;
-    let totalCE = 0;
+    let pnlPE = 0;
+    let pnlCE = 0;
+    let totalPNL = 0;
 
-    data.slice(1).forEach((row) => {
-      const optionType = row[optionTypeIndex]?.toString().trim().toUpperCase();
-      const pnl = parseFloat(row[pnlIndex]?.toString().replace(/[^0-9.-]/g, '')) || 0;
-      const margin = parseFloat(row[marginIndex]?.toString().replace(/[^0-9.-]/g, '')) || 0;
+    rows.forEach((row) => {
+      const margin = parseFloat(row[marginIndex]) || 0;
+      const pnl = parseFloat(row[pnlIndex]) || 0;
+      const optionType = row[optionTypeIndex] || "";
 
       totalInvestment += margin;
+      totalPNL += pnl;
 
-      if (optionType === 'PE') totalPE += pnl;
-      else if (optionType === 'CE') totalCE += pnl;
+      if (optionType === "PE") {
+        pnlPE += pnl;
+      } else if (optionType === "CE") {
+        pnlCE += pnl;
+      }
     });
 
-    return { totalInvestment, totalPE, totalCE };
+    return {
+      totalInvestment,
+      pnlPE,
+      pnlCE,
+      totalPNL,
+    };
   };
 
-  const { totalInvestment, totalPE, totalCE } = calculateValues();
+  const { totalInvestment, pnlPE, pnlCE, totalPNL } = data.length > 1 ? calculateSums() : {
+    totalInvestment: 0,
+    pnlPE: 0,
+    pnlCE: 0,
+    totalPNL: 0,
+  };
 
   const getPNLStyle = (value) => ({
+    color: value < 0 ? 'red' : 'green',
     fontWeight: 'bold',
-    fontSize: '16px',
-    marginTop: '5px',
-    color: value >= 0 ? 'green' : 'red',
   });
 
   return (
@@ -90,23 +103,29 @@ function App() {
         )}
       </div>
 
+      {/* Summary Section */}
       {data.length > 1 && (
-        <div style={{ marginBottom: '20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', marginBottom: '20px' }}>
           <div style={{ fontWeight: 'bold', fontSize: '16px' }}>
             Total number of trades: {data.length - 1}
-          </div>
-          <div style={{ fontWeight: 'bold', fontSize: '16px', marginTop: '5px' }}>
+            <br />
             Total Investment: ₹ {totalInvestment.toFixed(2)}
+            <br />
+            Overall PNL: <span style={getPNLStyle(totalPNL)}>₹ {totalPNL.toFixed(2)}</span>
           </div>
-          <div style={getPNLStyle(totalPE)}>
-            PNL_FOR_ALL_PE Options: ₹ {totalPE.toFixed(2)}
-          </div>
-          <div style={getPNLStyle(totalCE)}>
-            PNL_FOR_ALL_CE Options: ₹ {totalCE.toFixed(2)}
+
+          <div style={{ textAlign: 'right', fontWeight: 'bold', fontSize: '16px' }}>
+            <div>
+              PNL_FOR_ALL_PE Options: <span style={getPNLStyle(pnlPE)}>₹ {pnlPE.toFixed(2)}</span>
+            </div>
+            <div>
+              PNL_FOR_ALL_CE Options: <span style={getPNLStyle(pnlCE)}>₹ {pnlCE.toFixed(2)}</span>
+            </div>
           </div>
         </div>
       )}
 
+      {/* Table Rendering */}
       {data.length > 0 && (
         <table border="1" cellPadding="8" style={{ borderCollapse: 'collapse', width: '100%' }}>
           <tbody>
@@ -125,4 +144,3 @@ function App() {
 }
 
 export default App;
-
