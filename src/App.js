@@ -26,71 +26,56 @@ function App() {
     setData([]);
   };
 
-  const getColumnIndex = (headerName) => {
-    return data.length > 0 ? data[0].indexOf(headerName) : -1;
+  // Utility to format currency
+  const formatCurrency = (num) => {
+    return '₹ ' + num.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,');
   };
 
-  const calculateSummary = () => {
-    const marginIndex = getColumnIndex('MARGIN');
-    const pnlIndex = getColumnIndex('PNL_BUYPRICE_CLOSEPRICE');
-    const optionTypeIndex = getColumnIndex('OPTION TYPE');
+  // Utility to get color for PNL values
+  const getColor = (val) => (val < 0 ? 'red' : 'green');
 
-    if (marginIndex === -1 || pnlIndex === -1 || optionTypeIndex === -1) {
-      return {
-        totalInvestment: 0,
-        pnlPE: 0,
-        pnlCE: 0,
-        overallPNL: 0,
-      };
-    }
+  // Only process if data exists and header is present
+  const header = data[0] || [];
+  const rows = data.slice(1);
 
-    let totalInvestment = 0;
-    let pnlPE = 0;
-    let pnlCE = 0;
-    let overallPNL = 0;
+  // Get indexes for columns by header names
+  const idxOptionType = header.indexOf('OPTIONTYPE');
+  const idxMargin = header.indexOf('MARGIN');
+  const idxPNL = header.indexOf('PNL_BUYPRICE_CLOSEPRICE');
 
-    for (let i = 1; i < data.length; i++) {
-      const row = data[i];
-      const margin = parseFloat(row[marginIndex]) || 0;
-      const pnl = parseFloat(row[pnlIndex]) || 0;
-      const type = row[optionTypeIndex]?.toUpperCase();
+  // Calculate totals safely only if columns exist
+  const totalTrades = rows.length;
 
-      totalInvestment += margin;
-      overallPNL += pnl;
+  const totalInvestment = idxMargin >= 0
+    ? rows.reduce((sum, row) => sum + (parseFloat(row[idxMargin]) || 0), 0)
+    : 0;
 
-      if (type === 'PE') {
-        pnlPE += pnl;
-      } else if (type === 'CE') {
-        pnlCE += pnl;
-      }
-    }
+  const pePNL = idxPNL >= 0 && idxOptionType >= 0
+    ? rows.reduce(
+        (sum, row) => (row[idxOptionType] === 'PE' ? sum + (parseFloat(row[idxPNL]) || 0) : sum),
+        0
+      )
+    : 0;
 
-    return {
-      totalInvestment,
-      pnlPE,
-      pnlCE,
-      overallPNL,
-    };
-  };
+  const cePNL = idxPNL >= 0 && idxOptionType >= 0
+    ? rows.reduce(
+        (sum, row) => (row[idxOptionType] === 'CE' ? sum + (parseFloat(row[idxPNL]) || 0) : sum),
+        0
+      )
+    : 0;
 
-  const { totalInvestment, pnlPE, pnlCE, overallPNL } = calculateSummary();
-
-  const formatCurrency = (value) =>
-    `₹ ${value.toLocaleString('en-IN', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`;
-
-  const getColor = (value) => (value >= 0 ? 'green' : 'red');
-
-  const pnlIndex = getColumnIndex('PNL_BUYPRICE_CLOSEPRICE');
+  const overallPNL = idxPNL >= 0
+    ? rows.reduce((sum, row) => sum + (parseFloat(row[idxPNL]) || 0), 0)
+    : 0;
 
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
+      {/* Header */}
       <h1 style={{ marginBottom: '10px', textAlign: 'center', color: '#2c3e50' }}>
         Real-Time Trading Data - Options
       </h1>
 
+      {/* Upload / Home button */}
       <div style={{ marginBottom: '20px' }}>
         {data.length === 0 ? (
           <div style={{ textAlign: 'center' }}>
@@ -115,41 +100,80 @@ function App() {
         )}
       </div>
 
+      {/* Summary Box */}
       {data.length > 1 && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px' }}>
-          <div>
-            <div style={{ fontWeight: 'bold', fontSize: '16px' }}>
-              Total number of trades: {data.length - 1}
+        <div
+          style={{
+            border: '1px solid #ccc',
+            borderRadius: '8px',
+            padding: '20px',
+            backgroundColor: '#f8f9fa',
+            marginBottom: '30px',
+            width: '100%',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+          }}
+        >
+          {/* Left Side */}
+          <div style={{ minWidth: '300px' }}>
+            <div
+              style={{
+                fontWeight: 'bold',
+                fontSize: '16px',
+                marginBottom: '10px',
+                textAlign: 'left',
+              }}
+            >
+              Total number of trades: {totalTrades}
             </div>
-            <div style={{ fontWeight: 'bold', fontSize: '16px' }}>
+            <div
+              style={{
+                fontWeight: 'bold',
+                fontSize: '16px',
+                marginBottom: '10px',
+                textAlign: 'left',
+              }}
+            >
               Total Investment: {formatCurrency(totalInvestment)}
             </div>
           </div>
-          <div style={{ textAlign: 'right' }}>
+
+          {/* Center Section (PE, CE, Overall PNL) */}
+          <div
+            style={{
+              textAlign: 'center',
+              flex: 1,
+              minWidth: '300px',
+            }}
+          >
             <div
               style={{
                 fontWeight: 'bold',
                 fontSize: '16px',
-                color: getColor(pnlPE),
+                marginBottom: '10px',
+                color: getColor(pePNL),
               }}
             >
-              PNL_FOR_ALL_PE Options: {formatCurrency(pnlPE)}
+              PNL_FOR_ALL_PE Options: {formatCurrency(pePNL)}
             </div>
             <div
               style={{
                 fontWeight: 'bold',
                 fontSize: '16px',
-                color: getColor(pnlCE),
+                marginBottom: '10px',
+                color: getColor(cePNL),
               }}
             >
-              PNL_FOR_ALL_CE Options: {formatCurrency(pnlCE)}
+              PNL_FOR_ALL_CE Options: {formatCurrency(cePNL)}
             </div>
             <div
               style={{
                 fontWeight: 'bold',
-                fontSize: '16px',
+                fontSize: '18px',
                 color: getColor(overallPNL),
-                marginTop: '8px',
               }}
             >
               Overall PNL: {formatCurrency(overallPNL)}
@@ -158,23 +182,28 @@ function App() {
         </div>
       )}
 
+      {/* Render table */}
       {data.length > 0 && (
-        <table border="1" cellPadding="8" style={{ borderCollapse: 'collapse', width: '100%' }}>
+        <table
+          border="1"
+          cellPadding="8"
+          style={{ borderCollapse: 'collapse', width: '100%' }}
+        >
           <tbody>
             {data.map((row, i) => (
-              <tr key={i}>
-                {row.map((cell, j) => (
-                  <td
-                    key={j}
-                    style={
-                      j === pnlIndex && i > 0
-                        ? { color: getColor(parseFloat(cell) || 0), fontWeight: 'bold' }
-                        : {}
-                    }
-                  >
-                    {cell}
-                  </td>
-                ))}
+              <tr key={i} style={i === 0 ? { fontWeight: 'bold', backgroundColor: '#eaeaea' } : {}}>
+                {row.map((cell, j) => {
+                  // Highlight PNL_BUYPRICE_CLOSEPRICE column values by color
+                  if (i > 0 && j === idxPNL) {
+                    const val = parseFloat(cell);
+                    return (
+                      <td key={j} style={{ color: val < 0 ? 'red' : 'green' }}>
+                        {cell}
+                      </td>
+                    );
+                  }
+                  return <td key={j}>{cell}</td>;
+                })}
               </tr>
             ))}
           </tbody>
